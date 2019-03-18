@@ -1,5 +1,8 @@
 VolleyPlus
 ==========
+
+<a href="https://www.buymeacoffee.com/1hakr" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/yellow_img.png" alt="Buy Me A Coffee" height='50' style='border:0px;height:50px;' ></a>
+
 ![VolleyPlus](https://github.com/DWorkS/VolleyPlus/raw/master/header.png)
 
 **VolleyPlus** library Project improvements to Volley along with full image caching.It involves using **RequestQueue**, **RequestTickle** and **Request**.
@@ -26,7 +29,7 @@ VolleyPlus
 * JsonArrayRequest
 * GsonRequest
 * GZipRequest
-* MultiPartRequest
+* [MultiPartRequest](https://github.com/DWorkS/VolleyPlus/wiki/Multipart-Request)
 * SimpleMultiPartRequest
 * DownloadRequest
 * ImageRequest

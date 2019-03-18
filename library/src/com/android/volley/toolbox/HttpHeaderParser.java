@@ -16,18 +16,17 @@
 
 package com.android.volley.toolbox;
 
-import java.io.ByteArrayOutputStream;
-import java.util.Map;
+import android.graphics.Bitmap;
+
+import com.android.volley.Cache;
+import com.android.volley.NetworkResponse;
 
 import org.apache.http.impl.cookie.DateParseException;
 import org.apache.http.impl.cookie.DateUtils;
 import org.apache.http.protocol.HTTP;
 
-import android.graphics.Bitmap;
-import android.support.v4.util.ArrayMap;
-
-import com.android.volley.Cache;
-import com.android.volley.NetworkResponse;
+import java.io.ByteArrayOutputStream;
+import java.util.Map;
 
 /**
  * Utility methods for parsing HTTP headers.
@@ -35,6 +34,21 @@ import com.android.volley.NetworkResponse;
 public class HttpHeaderParser {
 
     private HttpHeaderParser() {}
+    /**
+     * Extracts a {@link Cache.Entry} from a {@link NetworkResponse}.
+     * Cache-control headers are ignored if soft_expire and expire both are non zero
+     * @param response The network response to parse headers from
+     * @param soft_expire The soft expire duration in milli seconds
+     * @param expire The full expire duration in milli seconds
+     * @return a cache entry for the given response, or null if the response is not cacheable.
+     */
+    public static Cache.Entry parseCacheHeaders(NetworkResponse response, long soft_expire, long expire) {
+        if(soft_expire == 0 && expire == 0){
+            return parseCacheHeaders(response);
+        } else {
+            return parseIgnoreCacheHeaders(response, soft_expire, expire);
+        }
+    }
 
     /**
      * Extracts a {@link Cache.Entry} from a {@link NetworkResponse}.
@@ -53,6 +67,7 @@ public class HttpHeaderParser {
         long maxAge = 0;
         long staleWhileRevalidate = 0;
         boolean hasCacheControl = false;
+        boolean mustRevalidate = false;
         Map<String, String> headers = null;
         String serverEtag = null;
         
@@ -87,6 +102,7 @@ public class HttpHeaderParser {
                         }
                     } else if (token.equals("must-revalidate") || token.equals("proxy-revalidate")) {
                         maxAge = 0;
+                        mustRevalidate = true;
                     }
                 }
 	        }
@@ -106,8 +122,10 @@ public class HttpHeaderParser {
 	        // Cache-Control takes precedence over an Expires header, even if both exist and Expires
 	        // is more restrictive.
 	        if (hasCacheControl) {
-	            softExpire = now + maxAge * 1000;
-                finalExpire = softExpire + staleWhileRevalidate * 1000;
+                softExpire = now + maxAge * 1000;
+                finalExpire = mustRevalidate
+                        ? softExpire
+                        : softExpire + staleWhileRevalidate * 1000;
 	        } else if (serverDate > 0 && serverExpires >= serverDate) {
 	            // Default semantic for Expire header in HTTP specification is softExpire.
 	            softExpire = now + (serverExpires - serverDate);
@@ -206,8 +224,8 @@ public class HttpHeaderParser {
 
         final long cacheHitButRefreshed = soft_expire; // in this duration cache will be hit, but also refreshed on background
         final long cacheExpired = expire; // in this duration this cache entry expires completely
-        final long softExpire = now  + cacheHitButRefreshed;
-        final long ttl = now + cacheExpired;
+        final long softExpire = soft_expire == 0 ? 0 : now + soft_expire;
+        final long ttl = expire == 0 ? 0 : now + expire;
 
         Cache.Entry entry = new Cache.Entry();
         entry.data = response.data;
@@ -242,18 +260,21 @@ public class HttpHeaderParser {
      * or the defaultCharset if none can be found.
      */
     public static String parseCharset(Map<String, String> headers, String defaultCharset) {
-        String contentType = headers.get(HTTP.CONTENT_TYPE);
-        if (contentType != null) {
+        String contentType = (String)headers.get("Content-Type");
+        if(null == contentType) {
+            contentType = (String) headers.get("content-type");
+        }
+        if(contentType != null) {
             String[] params = contentType.split(";");
-            for (int i = 1; i < params.length; i++) {
+
+            for(int i = 1; i < params.length; ++i) {
                 String[] pair = params[i].trim().split("=");
-                if (pair.length == 2) {
-                    if (pair[0].equals("charset")) {
-                        return pair[1];
-                    }
+                if(pair.length == 2 && pair[0].equals("charset")) {
+                    return pair[1];
                 }
             }
         }
+
         return defaultCharset;
     }
     /**

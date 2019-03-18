@@ -8,9 +8,11 @@ import com.android.volley.Response.Listener;
 import com.android.volley.error.AuthFailureError;
 import com.android.volley.error.ParseError;
 import com.android.volley.toolbox.HttpHeaderParser;
+import com.android.volley.toolbox.VolleyTickle;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.Map;
  
@@ -84,11 +86,19 @@ public class GsonRequest<T> extends Request<T> {
             String json = new String(
                     response.data, HttpHeaderParser.parseCharset(response.headers));
             return Response.success(
-                    gson.fromJson(json, clazz), HttpHeaderParser.parseCacheHeaders(response));
+                    gson.fromJson(json, clazz), HttpHeaderParser.parseCacheHeaders(response, getSoftExpire(), getExpire()));
         } catch (UnsupportedEncodingException e) {
             return Response.error(new ParseError(e));
         } catch (JsonSyntaxException e) {
             return Response.error(new ParseError(e));
         }
+    }
+
+    protected T getResult(NetworkResponse response) {
+        if (response.statusCode >= 200 || response.statusCode < 300) {
+            String data = VolleyTickle.parseResponse(response);
+            return gson.fromJson(data, clazz);
+        }
+        return null;
     }
 }
